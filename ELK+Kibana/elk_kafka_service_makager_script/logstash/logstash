@@ -1,0 +1,67 @@
+#!/bin/bash
+
+#chkconfig: 2345 55 24
+#description: logstash service manager
+
+FILE='/usr/local/logstash/etc/logstash_agent.conf'
+LOGBIN='/usr/local/logstash/bin/logstash agent --verbose --config'
+LOCK='/usr/local/logstash/locks'
+LOGLOG='--log /usr/local/logstash/logs/stdou.log'
+
+START() {
+	if [ -f $LOCK ];then
+		echo -e "Logstash is already \033[32mrunning\033[0m, do nothing."
+	else
+		echo -e "Start logstash service.\033[32mdone\033[m"
+		nohup ${LOGBIN} ${FILE} ${LOGLOG} &
+		touch $LOCK
+	fi
+}
+
+STOP() {
+	if [ ! -f $LOCK ];then
+		echo -e "Logstash is already stop, do nothing."
+	else
+		echo -e "Stop logstash serivce \033[32mdone\033[m"
+		rm -rf $LOCK
+		ps -ef | grep logstash | grep -v "grep" | awk '{print $2}' | xargs kill -s 9 >/dev/null
+	fi
+}
+
+STATUS() {
+	ps aux | grep logstash | grep -v "grep" >/dev/null
+	if [ -f $LOCK ] && [ $? -eq 0 ]; then
+		echo -e "Logstash is: \033[32mrunning\033[0m..."
+	else
+		echo -e "Logstash is: \033[31mstopped\033[0m..."
+	fi
+}
+
+TEST(){
+	${LOGBIN} ${FILE} --configtest
+}
+
+
+
+case "$1" in
+  start)
+	START
+	;;
+  stop)
+	STOP
+	;;
+  status)
+	STATUS
+	;;
+  restart)
+	STOP 
+        sleep 2
+        START
+	;;
+  test)
+	TEST
+	;;
+  *)
+	echo "Usage: /etc/init.d/logstash (test|start|stop|status|restart)"
+	;;
+esac

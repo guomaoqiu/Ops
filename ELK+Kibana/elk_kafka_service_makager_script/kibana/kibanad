@@ -1,0 +1,58 @@
+#!/bin/bash
+
+#chkconfig: 2345 55 24
+#description: kibana service manager
+
+KIBBIN='/usr/local/kibana/bin/kibana'
+LOCK='/usr/local/kibana/locks'
+
+START() {
+	if [ -f $LOCK ];then
+		echo -e "kibana is already \033[32mrunning\033[0m, do nothing."
+	else
+		echo -e "Start kibana service.\033[32mdone\033[m"
+		cd  /usr/local/kibana/bin
+    	nohup ./kibana & >/dev/null
+ 		touch $LOCK
+	fi
+}
+
+STOP() {
+	if [ ! -f $LOCK ];then
+		echo -e "kibana is already stop, do nothing."
+	else
+		echo -e "Stop kibana serivce \033[32mdone\033[m"
+		rm -rf $LOCK
+		ps -ef | grep kibana | grep -v "grep" | awk '{print $2}' | xargs kill -s 9 >/dev/null
+	fi
+}
+
+STATUS() {
+        Port=$(netstat -tunl | grep ":5602")
+	if [ "$Port" != "" ] && [ -f $LOCK ];then
+		echo -e "kibana is: \033[32mrunning\033[0m..."
+	else
+		echo -e "kibana is: \033[31mstopped\033[0m..."
+	fi
+}
+
+
+case "$1" in
+  start)
+	START
+	;;
+  stop)
+	STOP
+	;;
+  status)
+	STATUS
+	;;
+  restart)
+	STOP 
+    sleep 2
+    START
+	;;
+  *)
+	echo "Usage: /etc/init.d/kibana (|start|stop|status|restart)"
+	;;
+esac

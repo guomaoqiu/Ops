@@ -1,0 +1,50 @@
+#/bin/bash
+# chkconfig: 2345 20 81
+# auth: guomaoqiu
+# date: 2015-10-09
+
+CONFIG=/usr/local/kafka
+
+#
+if [ ! -d  ${CONFIG}/nohup ];then
+    mkdir  ${CONFIG}/nohup/{zookeeper,kafka} -p
+fi
+
+#
+start(){
+    netstat -nlpt | grep -E "2888|3888|2181" >/dev/null
+    if [[ $? -eq 0 ]]; then
+      echo "already start"
+      exit
+    fi
+    cd ${CONFIG}/nohup/zookeeper
+    echo  "Starting zookeeper..."
+    nohup /bin/bash  ${CONFIG}/bin/zookeeper-server-start.sh ${CONFIG}/config/zookeeper.properties 2>&1 &
+}
+
+stop(){
+    echo "Stoping zookeeper..."
+    ps ax | grep -i 'zookeeper.properties' | grep -v grep | awk '{print $1}' | xargs kill -SIGTERM
+}
+
+status(){
+    netstat -nlpt | grep -E "2888|3888|2181" >/dev/null
+    if [ $? -eq 0 ];then
+       echo "Zookeeper is running"
+    else
+       echo "Zookeeper is stopped" 
+    fi
+}
+
+
+case "$1" in
+start)
+  start
+  ;;
+stop)
+  stop
+  ;;
+status)
+  status
+  ;;
+esac
