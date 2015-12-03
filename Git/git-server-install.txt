@@ -1,0 +1,126 @@
+1.创建git用户www
+# useradd www
+
+2.创建用户key
+# su - www
+$ ssh-keygen -t rsa -C "guomaoqiu@sina.com"  #一路回车
+$ cat .ssh/id_rsa.pub > .ssh/authorized_keys 
+$ chmod 600 .ssh/authorized_keys
+
+3.创建版本库
+$ mkdir /home/www/code
+$ cd /home/www/code
+$ git --bare init #初始化版本库
+
+4.复制www用户的私钥到root/.ssh目录下
+# cp /home/www/.ssh/id_rsa /root/.ssh/
+
+
+5.克隆版本库
+# su - www
+$ cd /var/www/
+$ git clone www@127.0.0.1:code   #这里直接回车直接就克隆下来了，无需输入密码
+
+6.添加信任主机
+在我本地，也就是需要上传代码到git-server这的这台上创建好公私钥，然后将公钥内容其拷贝至git-server中www中户的.ssh/authorized_keys中
+然后在本地执行：
+demo@demo:~$ git clone www@192.168.2.23:code
+Cloning into 'code'...
+remote: Counting objects: 11, done.
+remote: Compressing objects: 100% (8/8), done.
+remote: Total 11 (delta 1), reused 0 (delta 0)
+Receiving objects: 100% (11/11), done.
+Resolving deltas: 100% (1/1), done.
+Checking connectivity... done.
+demo@demo:~$ 
+
+然后将我们的代码移动到这个目录,然后一次执行以下命令
+demo@demo:~$ git add -A
+demo@demo:~$ git commit -m 'test'
+demo@demo:~$ git push origin master
+
+7.忽略文件上传.(本地)
+在code目录中新建文件：(相对于代码目录code)
+demo@demo:~/code$ vim .gitignore
+test/test1/a.php
+library/tmp/    #忽略的是目录
+*.txt
+*.gz
+.gitignore
+.git/
+上面这些文件或者目录在我们进行上传的时候就会忽略掉，就不会push到版本库中啦，
+然后我们在git-server 上面的/var/www/code 中直接执行git pull就可以从远程仓库
+拉去代码到代码目录啦。
+
+那如何是实现我们在本地执行push后让git帮我们去代码目录执行pull，看下面
+
+8.如何利用钩子实现自动部署代码到代码目录/var/www/code(需要先将仓库目录clone到/var/www/中，确保有.git文件)
+vim /home/www/code/hooks/post-receive
+#!/bin/sh
+unset GIT_DIR
+NowPath=`pwd`
+echo "now path is :"$NowPath
+DeployPath="/var/www/code/"   # 网站代码目录
+echo "deploy path is :"$DeployPath
+cd $DeployPath
+echo "cd deploy path"
+#git add . -A && git stash # remove local changes 
+git pull  # pull data from master
+# the follow line is also ok:
+# git add . && git fetch origin && git reset --hard origin/master
+echo "deploy done"
+cd $NowPath
+echo "fine"
+# --- Finished
+exit 0
+
+chmod +x /home/www/code/hooks/post-receive
+chownwww:www /home/www/code/hooks/post-receive
+
+9.当我再次提交代码时就是这样，返回结果的：
+demo@demo:~/code$ git add -A
+demo@demo:~/code$ git commit -m 'test2'
+[master 7524f4d] test2
+ 3 files changed, 0 insertions(+), 0 deletions(-)
+ create mode 100644 1.jpg
+ create mode 100644 a.php
+ create mode 100644 c.png
+demo@demo:~/code$ git push origin master
+Counting objects: 3, done.
+Delta compression using up to 4 threads.
+Compressing objects: 100% (2/2), done.
+Writing objects: 100% (3/3), 239 bytes | 0 bytes/s, done.
+Total 3 (delta 0), reused 1 (delta 0)
+remote: cd deploy path
+remote: From 127.0.0.1:code
+remote:    55eb523..7524f4d  master     -> origin/master
+remote: Updating 55eb523..7524f4d
+remote: Fast-forward
+remote:  1.jpg | 0
+remote:  a.php | 0
+remote:  c.png | 0
+remote:  3 files changed, 0 insertions(+), 0 deletions(-)
+remote:  create mode 100644 1.jpg
+remote:  create mode 100644 a.php
+remote:  create mode 100644 c.png
+remote: deploy done
+To www1@192.168.2.23:code
+   55eb523..7524f4d  master -> master
+demo@demo:~/code$
+
+这时再到git-server目录上去看以下是否从版本库pull下来了
+[www@git-server code]$ pwd
+/var/www/code
+[www@git-server code]$ ls
+1.jpg  a.php  c.png
+[www@git-server code]$ 
+
+
+注意点：
+1.目录的权限
+2..gitignore是放在push操作上面的
+
+
+
+
+
